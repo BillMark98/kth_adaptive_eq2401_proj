@@ -26,7 +26,7 @@ function [yhat,xhatfilt,xhatpred,P,Q] = kalman(y, F, G, H, R1, R2, x0, Q0)
 %  time instance.
 %               
 %           
-%     Author:
+%     Author: Panwei Hu
 %
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -51,7 +51,11 @@ yhat(1,:)=xhatpred(1,:)*H'; % Better to calculate yhat in a single
 
 for n=1:N-1
   % Calculate xhat(n+1|n), xhat(n+1|n+1) and yhat(n+1|n) here!
-  
-  
+  xhatpred(n+1,:) = xhatfilt(n,:) * F';
+  yhat(n+1,:) = xhatpred(n+1,:) * H';
+  P = F * Q * F' + G * R1 * G';
+  L = P * H' / (H * P * H' + R2);
+  xhatfilt(n+1,:) = xhatpred(n+1,:) + (y(n+1,:) - xhatpred(n+1,:) * H')* L';
+  Q=P-P*H'/(H*P*H'+R2)*H*P;  
 end
 

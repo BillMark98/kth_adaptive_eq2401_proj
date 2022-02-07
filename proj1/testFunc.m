@@ -57,7 +57,24 @@ legend("Observations y", "Signal", nc_legend, c_legend, fir_legend);
 figure
 spec_comp(A, sigma2, Anoise, sigma2noise, numnc, dennc, numc, denc, thetahatfir);
 
+%% 4.1
+F = [1,2;1.5,0];
+G = [1,1;0,1];
+R1 = [2,0;0,3];
+H = [0,1];
+R2 = 1;
+x0 = [1;0];
+K = 4;
+[x,y] = gen_ss(F,G,H,R1,R2,x0,K)
 
+%% 4.2
+
+clear;
+load krefdata
+[yhat,xhatfilt,xhatpred,P,Q] = kalman(y, F, G, H, R1, R2, x0, Q0)
+diff_max_xhatfilt = max(xhatfiltref - xhatfilt);
+diff_max_yhat = max(yhatref - yhat);
+diff_max_xhatpred = max(xhatpredref - xhatpred);
 %% 5.1
 test_r = randn(1000,1);
 A = [1, -0.5];

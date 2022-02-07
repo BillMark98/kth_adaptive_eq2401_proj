@@ -23,7 +23,26 @@ function [x,y] = gen_ss(F, G, H, R1, R2, x0, K)
 %  time instance.
 %               
 %     
-%     Author: 
+%     Author: Panwei Hu
 %
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% generate K noise v
+dimv = size(R2,1);
+v = randn(K,dimv) * (chol(R2));
+
+% generate K noise vector w (row vector wise)
+dimw = size(R1,1);
+w = randn(K, dimw) * (chol(R1));
+
+% generate x
+[m,n] = size(F);
+x = zeros(K,m);
+x(1,:) = columnVector(x0)';
+
+for i = 2 : K
+    x(i,:) = F * x(i-1,:)' + G * w(i-1,:)';
+end
+
+y = (H * x' + v')';
