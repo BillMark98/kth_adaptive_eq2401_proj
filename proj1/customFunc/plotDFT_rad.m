@@ -3,7 +3,8 @@ function plotDFT_rad(z,plotTitle)
 % plot the dft
 % fs  the sampling frequency
 y = fft(z);                               % Compute DFT of x
-
+% scale to the correct fourier coeff
+y = y / length(z);
 omega_samp = (0:length(y)-1)*2 * pi/length(y);        % Frequency vector
 % only need to plot half
 y = y(1:floor(length(y)/2));

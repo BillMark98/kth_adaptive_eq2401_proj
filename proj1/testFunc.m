@@ -75,6 +75,42 @@ load krefdata
 diff_max_xhatfilt = max(xhatfiltref - xhatfilt);
 diff_max_yhat = max(yhatref - yhat);
 diff_max_xhatpred = max(xhatpredref - xhatpred);
+
+%% 4.3
+clear;
+[x,y] = pol2cart(pi/4, 0.98);
+A = poly([x + 1i * y, x - 1i * y]);
+sigma2noise = 1;
+L = 1000;
+e = randn(L,1);
+y = sqrt(sigma2noise) * filter(1,A,e);
+
+x0 = [0,0]';
+Q0 = zeros(2);
+F = [-A(2), -A(3); 1, 0];
+G = [1,0]';
+H = [1, 0];
+R1 = sigma2noise;
+R2 = 0;
+[yhat,xhatfilt,xhatpred,P,Q] = kalman(y, F, G, H, R1, R2, x0, Q0);
+ykalman_error = y - yhat;
+
+% causal
+[PhixyNum, PhixyDen] = filtspec(1,A,sigma2noise);
+% should shift by one, because z/A(z)A(z^-1)
+PhixyDen = [0, PhixyDen];
+[PhiyyNum, PhiyyDen] = filtspec(1,A,sigma2noise);
+[yhatc,num,den] = cw(y,PhixyNum,PhixyDen,PhiyyNum,PhiyyDen,1);
+yc_error = y - yhatc;
+
+[yhatnc,num,den] = ncw(y,PhixyNum, PhixyDen, PhiyyNum, PhiyyDen);
+ync_error = y - yhatnc;
+figure
+plot(ykalman_error);
+hold on
+plot(yc_error); 
+plot(ync_error);
+legend('kalman', 'causal', 'non-causal')
 %% 5.1
 test_r = randn(1000,1);
 A = [1, -0.5];
