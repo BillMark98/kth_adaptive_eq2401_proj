@@ -29,7 +29,7 @@ figure
 plotDFT_rad(sound_sample, "Sound+noise");
 soundsc(sound_sample,fs);
 % estimate 1st, nearly zero
-m_sound = mean(sound_sample);
+m_sound = mean(sound_sample)
 %% FIR
 fir_length = 1000;
 
@@ -79,7 +79,6 @@ soundsc(xhat,fs);
 %% estimate sound
 N_sound = 8;
 [Ahat, sigma2hat] = ar_id(xhat,N_sound);
-figure
 plotSpec(1,Ahat,1, sigma2hat, 'estimate Sound');
 
 %% NCW
@@ -164,3 +163,89 @@ soundsc(xhatnc,fs);
 
 %% compare
 spec_comp(Ahat,sigma2hat,Anoisehat,sigma2noisehat,numnc,dennc,numc,denc,thetahatfir);
+
+
+%% Use estimate of psd to calculate nc
+%% alt  phixy / phiyy
+
+[phixyEst, w_xy] = cpsd(filter_sound, sound_sample, [],[], length(sound_sample));
+
+[phiyyEst, w_yy] = pwelch(sound_sample, [],[], length(sound_sample));
+
+H_est = phixyEst ./ phiyyEst;   
+N_len = 2 * length(H_est) - 1;
+
+z_trans = fft(z, N_len);
+z_trans_onesided = z_trans(1:length(H_est));
+x_trans = conjugateFlip(H_est .* z_trans_onesided);
+x = ifft(x_trans);
+% weird sound
+plotDFT_rad(x,'xconv');
+soundsc(x, fs)
+
+
+%% conv in time domain
+H_est_freqShift = H_est .* (-1).^(0:length(H_est)-1)';
+H_est_spec = conjugateFlip(H_est_freqShift) * length(H_est_freqShift);
+h_est = columnVector(ifft(H_est_spec));
+x_nc = imfilter(sound_sample, h_est);
+plotDFT_rad(x_nc,'non-causal')
+soundsc(x_nc,fs);
+%% phixy = phiyy - phivv
+[phivvEst, wvv] = pwelch(noise_sample,[],[], length(sound_sample));
+
+H_est2 = 1 - phivvEst ./ phiyyEst;
+% shift it by pi
+H_est2_freqShift = H_est2 .* (-1).^(0:length(H_est2)-1)';
+% conjugate flip to get 0 to 2pi spectrum
+H_est2_spec = conjugateFlip(H_est2_freqShift);
+% rescale to correct value for ifft
+H_est2_spec = H_est2_spec * length(H_est2_spec);
+h_est2 = columnVector(ifft(H_est2_spec));
+x_nc = imfilter(sound_sample, h_est2);
+plotDFT_rad(x_nc,'non-causal')
+soundsc(x_nc,fs);
+
+%% kalman forward
+
+%% 1 step estimate sound
+N_sound = 12;
+[Ahat_rcos, sigma2hat_rcos] = ar_id(filter_sound_rcos,N_sound);
+
+plotSpec(1,Ahat_rcos,1, sigma2hat_rcos, 'estimate Sound');
+
+N_noise = 6;
+[Anoisehat, sigma2noisehat] = ar_id(noise_sample,N_noise);
+
+%% 2 step set state space model
+F = diag(ones(N_sound-1,1),-1);
+F(1,:) = -Ahat_rcos(2:end);
+G = zeros(N_sound,1);
+G(1) = 1;
+H = zeros(1,N_sound);
+H(1) = 1;
+R1 = sigma2hat_rcos;
+% first alternative, fixed R2
+% R2 = E(signal^2) = E(total^2) - E(noise^2)
+R2 = sigma2noisehat;
+
+x0 = zeros(N_sound,1);
+Q0 = zeros(N_sound);
+y = sound_sample;
+[yhat_k,xhatfilt_k,xhatpred_k,P_k,Q_k] = kalman(y, F, G, H, R1, R2, x0, Q0);
+
+updateStep = 8;
+updateFactor = 0.4;
+[yhat_kad,xhatfilt_kad,xhatpred_kad,P,Q] = kalman_adapt(y, F, G, H, R1, R2, x0, Q0,updateFactor, updateStep);
+
+sound_pred_k = xhatfilt_k(:,1);
+
+sound_pred_kad = xhatfilt_kad(:,1);
+
+%% kalman
+plotDFT_rad(sound_pred_k, 'kalman')
+soundsc(sound_pred_k, fs);
+
+%% kalman adaptive
+plotDFT_rad(sound_pred_kad, 'kalman')
+soundsc(sound_pred_kad, fs);

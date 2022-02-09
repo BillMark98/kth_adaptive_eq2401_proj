@@ -112,6 +112,11 @@ plot(b,abs(a))
 ff_ = [1, 1+i, 2, 2, 1-i, 1];
 tt = ifft(ff_)
 
+ttt = [1,2,3,4,5,1];
+fff = fft(ttt)
+
+ttt = [1,2,3,5,5,1,2];
+ffff = fft(ttt)
 %% rcosdesign
 
 % first is rolloff factor

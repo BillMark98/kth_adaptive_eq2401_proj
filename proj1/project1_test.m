@@ -35,7 +35,7 @@ plotDFT_rad(z,'raw signal');
 
 % guess
 noise_sample = z(end-4000:end);
-sound_sample = z(100:end-4001);
+sound_sample = z(10:end-4001);
 
 plot(noise_sample)
 
@@ -59,7 +59,7 @@ soundsc(sound_sample, fs);
 % plotDFT(sound_sample,fs, "Sound+noise");
 figure
 plotDFT_rad(sound_sample, "Sound+noise");
-audiowrite("sound_noise.wav",sound_sample, fs);
+%audiowrite("sound_noise.wav",sound_sample, fs);
 %% filters
 
 % estimate sigmayx, yy
@@ -102,8 +102,8 @@ plotDFT_rad(noise_gen, 'noise gen')
 soundsc(noise_gen, fs);
 
 %% first filter out to get sound
-omegaLow = 0.1;
-omegaHigh = 0.8;
+omegaLow = 0.01;
+omegaHigh = 1.1;
 cutoutN = 200;
 
 % omegaLow = 0.2;
@@ -201,26 +201,33 @@ soundsc(xhatnc,fs);
 % psd method
 audiowrite("xhatnc.wav",xhatnc, fs);
 %% alt 1 phixy / phiyy
-[phixyEst, w_xy] = cpsd(filter_sound, sound_sample, [],[], floor(length(filter_sound)/2));
+% [phixyEst, w_xy] = cpsd(filter_sound, sound_sample, [],[], floor(length(filter_sound)/2));
+% 
+% [phiyyEst, w_yy] = pwelch(sound_sample, [],[], floor(length(sound_sample)/2));
 
-[phiyyEst, w_yy] = pwelch(sound_sample, [],[], floor(length(sound_sample)/2));
 
+[phixyEst, w_xy] = cpsd(filter_sound, sound_sample, [],[], length(filter_sound));
+
+[phiyyEst, w_yy] = pwelch(sound_sample, [],[], length(sound_sample));
 % extend phixy and phiyy
 % phixy is complex conjugate flip
-phixyEst = [phixyEst;conj(phixyEst(end:-1:1))];
-phiyyEst = [phiyyEst;phiyyEst(end:-1:1)];
-H_est = phixyEst ./ phiyyEst;
-z_trans = fft(z, length(H_est));
-x_trans = H_est .* z_trans;
-x = ifft(x_trans, length(z));
-x_conv = abs(x);
+% phixyEst = conjugateFlip(phixyEst);
+% phiyyEst = conjugateFlip(phiyyEst);
+H_est = phixyEst ./ phiyyEst;   
+N_len = 2 * length(H_est) - 1;
+
+z_trans = fft(z, N_len);
+z_trans_onesided = z_trans(1:length(H_est));
+x_trans = conjugateFlip(H_est .* z_trans_onesided);
+x = ifft(x_trans);
+
 % 
 % h_est = ifft(H_est);
 % 
 % x_conv = conv(abs(h_est), z); % does not work, h_est complex, meaning apprx in frequency domain not
-%%
-plotDFT_rad(x_conv,'xconv');
-soundsc(x_conv, fs)
+%
+plotDFT_rad(x,'xconv');
+soundsc(x, fs)
 
 %%
 z_trans = fftshift(fft(z)/length(z));
@@ -237,7 +244,13 @@ Hnew=[H_est(end:-1:2);H_est]
 [phivvEst, wvv] = pwelch(noise_sample,[],[], length(filter_sound));
 
 H_est2 = 1 - phivvEst ./ phiyyEst;
-h_est2 = ifft(H_est2);
+H_est2_freqShift = H_est2 .* (-1).^(0:length(H_est2)-1)';
+H_est2_spec = conjugateFlip(H_est2_freqShift);
+H_est2_spec = H_est2_spec * length(H_est2_spec);
+h_est2 = ifft(H_est2_spec)';
+x_nc = imfilter(sound_sample, h_est2);
+plotDFT_rad(x_nc,'non-causal')
+soundsc(x_nc,fs);
 %% sound of filtered
 soundsc(x_conv,fs);
 
@@ -290,12 +303,12 @@ soundsc(filter_z, fs);
 %% kalman forward
 
 %% 1 step estimate sound
-N_sound = 8;
+N_sound = 12;
 [Ahat_rcos, sigma2hat_rcos] = ar_id(filter_sound_rcos,N_sound);
-figure
+
 plotSpec(1,Ahat_rcos,1, sigma2hat_rcos, 'estimate Sound');
 
-N_noise = 4;
+N_noise = 6;
 [Anoisehat, sigma2noisehat] = ar_id(noise_sample,N_noise);
 % w=linspace(0,pi);
 % figure
@@ -321,7 +334,11 @@ R2 = sigma2noisehat;
 x0 = zeros(N_sound,1);
 Q0 = zeros(N_sound);
 y = sound_sample;
-[yhat,xhatfilt,xhatpred,P,Q] = kalman(y, F, G, H, R1, R2, x0, Q0);
+% [yhat,xhatfilt,xhatpred,P,Q] = kalman(y, F, G, H, R1, R2, x0, Q0);
+
+updateStep = 8;
+updateFactor = 0.6;
+[yhat,xhatfilt,xhatpred,P,Q] = kalman_adapt(y, F, G, H, R1, R2, x0, Q0,updateFactor, updateStep);
 
 sound_pred = xhatpred(:,1);
 
